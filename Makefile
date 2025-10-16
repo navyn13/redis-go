@@ -9,7 +9,7 @@ all: build
 
 build:
 	@mkdir -p $(BIN_DIR)
-	@go build -v -o $(BIN_DIR)/$(APP_NAME) ./...
+	@go build -v -o $(BIN_DIR)/$(APP_NAME) .
 
 run: build
 	@./$(BIN_DIR)/$(APP_NAME)
