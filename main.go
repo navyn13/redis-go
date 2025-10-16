@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"net"
@@ -19,6 +20,7 @@ type Server struct {
 	addPeerCh chan *Peer
 	quitCh    chan struct{}
 	msgCh     chan []byte
+	kv        *KV
 }
 
 type Config struct {
@@ -35,6 +37,7 @@ func NewServer(cfg Config) *Server {
 		addPeerCh: make(chan *Peer),
 		quitCh:    make(chan struct{}),
 		msgCh:     make(chan []byte),
+		kv:        NewKV(),
 	}
 }
 
@@ -66,11 +69,9 @@ func (s *Server) handleRawMessage(rawMsg []byte) error {
 		return err
 	}
 
-	switch c := cmd.(type) {
+	switch v := cmd.(type) {
 	case SetCommand:
-		slog.Info("SET Command Received", "key", c.key, "val", c.val)
-	default:
-		slog.Warn("Unknown Command", "cmd", cmd)
+		s.kv.Set(v.key, v.val)
 	}
 
 	return nil
@@ -100,17 +101,19 @@ func (s *Server) handleConn(conn net.Conn) {
 }
 
 func main() {
+	server := NewServer(Config{})
 	go func() {
-		server := NewServer(Config{})
 		log.Fatal(server.Start())
 	}()
 	time.Sleep(time.Second)
-	client := client.New("localhost:5001")
 
-	if err := client.Set(context.TODO(), "foo", "bar"); err != nil {
-		log.Fatal(err)
+	for i := 0; i < 10; i++ {
+		client := client.New("localhost:5001")
+		if err := client.Set(context.TODO(), fmt.Sprintf("foo %d", i), fmt.Sprintf("bar %d", i)); err != nil {
+			log.Fatal(err)
+		}
 	}
-
 	time.Sleep(2 * time.Second)
+	fmt.Println(server.kv.data)
 
 }
