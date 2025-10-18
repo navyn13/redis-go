@@ -13,13 +13,18 @@ import (
 
 const defaultListenAddr = ":5001"
 
+type Message struct {
+	cmd  Command
+	peer *Peer
+}
+
 type Server struct {
 	Config
 	ln        net.Listener
 	peers     map[*Peer]bool
 	addPeerCh chan *Peer
 	quitCh    chan struct{}
-	msgCh     chan []byte
+	msgCh     chan Message
 	kv        *KV
 }
 
@@ -36,7 +41,7 @@ func NewServer(cfg Config) *Server {
 		peers:     make(map[*Peer]bool),
 		addPeerCh: make(chan *Peer),
 		quitCh:    make(chan struct{}),
-		msgCh:     make(chan []byte),
+		msgCh:     make(chan Message),
 		kv:        NewKV(),
 	}
 }
@@ -62,16 +67,21 @@ func (s *Server) acceptLoop() error {
 		go s.handleConn(conn)
 	}
 }
-func (s *Server) handleRawMessage(rawMsg []byte) error {
+func (s *Server) handleMessage(msg Message) error {
 
-	cmd, err := parseCommand(string(rawMsg))
-	if err != nil {
-		return err
-	}
-
-	switch v := cmd.(type) {
+	switch v := msg.cmd.(type) {
 	case SetCommand:
 		s.kv.Set(v.key, v.val)
+	case GetCommand:
+		val, ok := s.kv.Get(v.key)
+		if !ok {
+			return fmt.Errorf("key not found")
+		}
+		_, err := msg.peer.Send(val)
+		if err != nil {
+			slog.Error("peer send error", "err", err)
+		}
+
 	}
 
 	return nil
@@ -80,8 +90,8 @@ func (s *Server) handleRawMessage(rawMsg []byte) error {
 func (s *Server) loop() {
 	for {
 		select {
-		case rawMsg := <-s.msgCh:
-			if err := s.handleRawMessage(rawMsg); err != nil {
+		case msg := <-s.msgCh:
+			if err := s.handleMessage(msg); err != nil {
 				slog.Error("raw Message Error", "err", err)
 			}
 		case <-s.quitCh:
@@ -95,7 +105,6 @@ func (s *Server) loop() {
 func (s *Server) handleConn(conn net.Conn) {
 	peer := NewPeer(conn, s.msgCh)
 	s.addPeerCh <- peer
-	slog.Info("new peer connected", "remoteAddr", conn.RemoteAddr())
 	go peer.readLoop()
 
 }
@@ -107,13 +116,22 @@ func main() {
 	}()
 	time.Sleep(time.Second)
 
+	c, err := client.New("localhost:5001")
+	if err != nil {
+		log.Fatal(err)
+	}
 	for i := 0; i < 10; i++ {
-		client := client.New("localhost:5001")
-		if err := client.Set(context.TODO(), fmt.Sprintf("foo %d", i), fmt.Sprintf("bar %d", i)); err != nil {
+		if err := c.Set(context.TODO(), fmt.Sprintf("foo %d", i), fmt.Sprintf("bar %d", i)); err != nil {
 			log.Fatal(err)
 		}
+		// time.Sleep(100 * time.Millisecond)
+
+		val, err := c.Get(context.TODO(), fmt.Sprintf("foo %d", i))
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("got this back=>", val)
 	}
-	time.Sleep(2 * time.Second)
-	fmt.Println(server.kv.data)
+	time.Sleep(1 * time.Second)
 
 }
