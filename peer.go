@@ -80,8 +80,18 @@ func (p *Peer) readLoop() error {
 						cmd:  cmd,
 						peer: p,
 					}
+				case CommandDelete:
+					if len(v.Array()) != 2 {
+						return fmt.Errorf("invalid number of vairbales DELETE command")
+					}
+					cmd := DeleteCommand{
+						key: v.Array()[1].Bytes(),
+					}
+					p.msgCh <- Message{
+						cmd:  cmd,
+						peer: p,
+					}
 				default:
-					//default case handling
 
 				}
 			}
