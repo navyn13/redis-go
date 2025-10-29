@@ -9,8 +9,9 @@ import (
 )
 
 type Peer struct {
-	conn  net.Conn
-	msgCh chan Message
+	conn          net.Conn
+	msgCh         chan Message
+	authenticated bool
 }
 
 func (p *Peer) Send(msg []byte) (int, error) {
@@ -57,6 +58,23 @@ func (p *Peer) readLoop() error {
 					}
 					cmd := GetCommand{
 						key: v.Array()[1].Bytes(),
+					}
+					p.msgCh <- Message{
+						cmd:  cmd,
+						peer: p,
+					}
+				case CommandAuth:
+					var cmd AuthCommand
+					if len(v.Array()) == 2 {
+						cmd = AuthCommand{password: v.Array()[1].String()}
+					} else if len(v.Array()) == 3 {
+						cmd = AuthCommand{
+							username: v.Array()[1].String(),
+							password: v.Array()[2].String(),
+						}
+					} else {
+						p.conn.Write([]byte("-ERR wrong number of arguments for 'auth' command\r\n"))
+						continue
 					}
 					p.msgCh <- Message{
 						cmd:  cmd,
