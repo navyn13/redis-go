@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"log/slog"
 	"net"
 	"time"
-
-	"github.com/navyn13/redis-go/client"
 )
 
 const defaultListenAddr = ":5001"
@@ -30,6 +27,8 @@ type Server struct {
 
 type Config struct {
 	ListenAddr string
+	Username   string
+	Password   string
 }
 
 func NewServer(cfg Config) *Server {
@@ -68,6 +67,13 @@ func (s *Server) acceptLoop() error {
 	}
 }
 func (s *Server) handleMessage(msg Message) error {
+	// Allow AUTH command without authentication
+	if _, isAuth := msg.cmd.(AuthCommand); !isAuth {
+		if !msg.peer.authenticated {
+			msg.peer.conn.Write([]byte("-NOAUTH Authentication required\r\n"))
+			return nil
+		}
+	}
 
 	switch v := msg.cmd.(type) {
 	case SetCommand:
@@ -81,7 +87,22 @@ func (s *Server) handleMessage(msg Message) error {
 		if err != nil {
 			slog.Error("peer send error", "err", err)
 		}
+	case AuthCommand:
+		// Verify credentials
+		validAuth := false
+		if v.username != "" {
+			validAuth = (v.username == s.Username && v.password == s.Password)
+		} else {
+			validAuth = (v.password == s.Password)
+		}
 
+		if validAuth {
+			msg.peer.authenticated = true
+			msg.peer.conn.Write([]byte("+OK\r\n"))
+		} else {
+			msg.peer.authenticated = false
+			msg.peer.conn.Write([]byte("-ERR invalid username-password pair\r\n"))
+		}
 	}
 
 	return nil
@@ -110,28 +131,15 @@ func (s *Server) handleConn(conn net.Conn) {
 }
 
 func main() {
-	server := NewServer(Config{})
+	server := NewServer(Config{
+		Username: "admin",
+		Password: "admin123",
+	})
 	go func() {
 		log.Fatal(server.Start())
 	}()
 	time.Sleep(time.Second)
 
-	c, err := client.New("localhost:5001")
-	if err != nil {
-		log.Fatal(err)
-	}
-	for i := 0; i < 10; i++ {
-		if err := c.Set(context.TODO(), fmt.Sprintf("foo %d", i), fmt.Sprintf("bar %d", i)); err != nil {
-			log.Fatal(err)
-		}
-		// time.Sleep(100 * time.Millisecond)
-
-		val, err := c.Get(context.TODO(), fmt.Sprintf("foo %d", i))
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println("got this back=>", val)
-	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(1000 * time.Second)
 
 }

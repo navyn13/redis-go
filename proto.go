@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	CommandSet = "SET"
-	CommandGet = "GET"
+	CommandSet  = "SET"
+	CommandGet  = "GET"
+	CommandAuth = "AUTH"
 )
 
 type Command interface{}
@@ -21,6 +22,10 @@ type SetCommand struct {
 }
 type GetCommand struct {
 	key []byte
+}
+type AuthCommand struct {
+	username string
+	password string
 }
 
 func parseCommand(raw string) (Command, error) {
@@ -55,10 +60,26 @@ func parseCommand(raw string) (Command, error) {
 						key: v.Array()[1].Bytes(),
 					}
 					return cmd, nil
+				case CommandAuth:
+					// AUTH can be: AUTH password  OR  AUTH username password
+					var cmd AuthCommand
+					if len(v.Array()) == 2 {
+						cmd = AuthCommand{password: v.Array()[1].String()}
+					} else if len(v.Array()) == 3 {
+						cmd = AuthCommand{
+							username: v.Array()[1].String(),
+							password: v.Array()[2].String(),
+						}
+					} else {
+						// Send error response
+						return nil, fmt.Errorf("invalid AUTH command")
+					}
+					return cmd, nil
 				default:
 					//default case handling
 
 				}
+
 			}
 		}
 	}
