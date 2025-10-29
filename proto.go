@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	CommandSet  = "SET"
-	CommandGet  = "GET"
-	CommandAuth = "AUTH"
+	CommandSet    = "SET"
+	CommandGet    = "GET"
+	CommandAuth   = "AUTH"
+	CommandDelete = "DELETE"
 )
 
 type Command interface{}
@@ -21,6 +22,9 @@ type SetCommand struct {
 	val []byte
 }
 type GetCommand struct {
+	key []byte
+}
+type DeleteCommand struct {
 	key []byte
 }
 type AuthCommand struct {
