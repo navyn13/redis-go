@@ -5,10 +5,20 @@ import (
 	"log"
 	"log/slog"
 	"net"
+	"os"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 const defaultListenAddr = ":5001"
+
+func loadEnv() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+}
 
 type Message struct {
 	cmd  Command
@@ -98,16 +108,14 @@ func (s *Server) handleMessage(msg Message) error {
 
 		if validAuth {
 			msg.peer.authenticated = true
-			msg.peer.conn.Write([]byte("+OK\r\n"))
+			msg.peer.conn.Write([]byte("+USERNAME and PASSWORD are correct\r\n"))
 		} else {
 			msg.peer.authenticated = false
-			msg.peer.conn.Write([]byte("-ERR invalid username-password pair\r\n"))
+			msg.peer.conn.Write([]byte("-USERNAME or PASSWORD are incorrect\r\n"))
 		}
 	}
-
 	return nil
 }
-
 func (s *Server) loop() {
 	for {
 		select {
@@ -131,9 +139,10 @@ func (s *Server) handleConn(conn net.Conn) {
 }
 
 func main() {
+	loadEnv()
 	server := NewServer(Config{
-		Username: "admin",
-		Password: "admin123",
+		Username: os.Getenv("USERNAME"),
+		Password: os.Getenv("PASSWORD"),
 	})
 	go func() {
 		log.Fatal(server.Start())
