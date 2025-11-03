@@ -6,7 +6,8 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"time"
+	"os/signal"
+	"syscall"
 
 	"github.com/joho/godotenv"
 )
@@ -150,9 +151,16 @@ func (s *Server) handleConn(conn net.Conn) {
 	fmt.Printf("\n🔗 New connection from: %s\n", conn.RemoteAddr())
 	peer := NewPeer(conn, s.msgCh)
 	s.addPeerCh <- peer
-	fmt.Println("📖 Starting read loop for peer...")
+	fmt.Println("Starting read loop for peer...")
 	go peer.readLoop()
+}
 
+func (s *Server) Shutdown() {
+	close(s.quitCh)
+	s.ln.Close()
+	for p := range s.peers {
+		p.conn.Close()
+	}
 }
 
 func main() {
@@ -165,6 +173,12 @@ func main() {
 		log.Fatal(server.Start())
 	}()
 
-	time.Sleep(1000 * time.Second)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	slog.Info("Shutting down server gracefully...")
+	server.Shutdown()
+	slog.Info("✅ Server stopped.")
 
 }
