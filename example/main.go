@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/joho/godotenv"
-	"github.com/navyn13/redis-go/blinkdb"
+	"github.com/navyn13/redis-go/redis"
 )
 
 func loadEnv() {
@@ -20,7 +20,7 @@ func loadEnv() {
 
 func main() {
 	loadEnv()
-	server := blinkdb.NewServer(blinkdb.Config{
+	server := redis.NewServer(redis.Config{
 		Username: os.Getenv("USERNAME"),
 		Password: os.Getenv("PASSWORD"),
 	})
@@ -35,5 +35,5 @@ func main() {
 
 	slog.Info("Shutting down server gracefully...")
 	server.Shutdown()
-	slog.Info("Server stopped.")
+	slog.Info("✅ Server stopped.")
 }
