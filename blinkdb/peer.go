@@ -1,4 +1,4 @@
-package main
+package blinkdb
 
 import (
 	"fmt"
@@ -8,17 +8,19 @@ import (
 	"github.com/tidwall/resp"
 )
 
+// Peer represents a connected client
 type Peer struct {
 	conn          net.Conn
 	msgCh         chan Message
 	authenticated bool
 }
 
+// Send sends a message to the peer
 func (p *Peer) Send(msg []byte) (int, error) {
 	return p.conn.Write(msg)
-
 }
 
+// NewPeer creates a new peer instance
 func NewPeer(conn net.Conn, msgCh chan Message) *Peer {
 	return &Peer{
 		conn:  conn,
@@ -45,7 +47,7 @@ func (p *Peer) readLoop() error {
 			switch cmdName {
 			case CommandSet:
 				if len(v.Array()) != 3 {
-					return fmt.Errorf("invalid number of vairbales SET command")
+					return fmt.Errorf("invalid number of variables SET command")
 				}
 				cmd := SetCommand{
 					key: v.Array()[1].Bytes(),
@@ -57,7 +59,7 @@ func (p *Peer) readLoop() error {
 				}
 			case CommandGet:
 				if len(v.Array()) != 2 {
-					return fmt.Errorf("invalid number of vairbales GET command")
+					return fmt.Errorf("invalid number of variables GET command")
 				}
 				cmd := GetCommand{
 					key: v.Array()[1].Bytes(),
@@ -85,7 +87,7 @@ func (p *Peer) readLoop() error {
 				}
 			case CommandDelete:
 				if len(v.Array()) != 2 {
-					return fmt.Errorf("invalid number of vairbales DELETE command")
+					return fmt.Errorf("invalid number of variables DELETE command")
 				}
 				cmd := DeleteCommand{
 					key: v.Array()[1].Bytes(),
@@ -97,8 +99,7 @@ func (p *Peer) readLoop() error {
 			default:
 				p.conn.Write([]byte("-ERR unknown command - USE SET, GET, DELETE, AUTH\r\n"))
 			}
-
 		}
 	}
-	return fmt.Errorf("unknown or invalid command")
+	return fmt.Errorf("connection closed")
 }
