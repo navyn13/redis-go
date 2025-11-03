@@ -85,7 +85,7 @@ func (s *Server) handleMessage(msg Message) error {
 	if _, isAuth := msg.cmd.(AuthCommand); !isAuth {
 		if !msg.peer.authenticated {
 			fmt.Println("Authentication required, rejecting command")
-			msg.peer.conn.Write([]byte("-NOAUTH Authentication required\r\n"))
+			msg.peer.conn.Write([]byte("-NOAUTH Authentication required - AUTH {USERNAME} {PASSWORD}\r\n"))
 			return nil
 		}
 	}
